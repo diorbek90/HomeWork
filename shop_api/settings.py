@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 # 321
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,7 +21,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-f$4lr7)wb^4@c9=+m^vosz455gtcwg$emi@^l)9trw9r2%-q#i'
+SECRET_KEY = os.environ.get('SECRET_KEY'z)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -85,11 +86,11 @@ WSGI_APPLICATION = 'shop_api.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'db_product',
-        'USER': 'admin_product',
-        'PASSWORD': '1234',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': os.environ.get('NAME_DB'),
+        'USER': os.environ.get('USER_DB'),
+        'PASSWORD': os.environ.get('PASSWORD_DB'),
+        'HOST': os.environ.get('HOST_DB'),
+        'PORT': os.environ.get('POST'),
     }
 }
 
