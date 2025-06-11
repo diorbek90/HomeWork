@@ -27,6 +27,7 @@ class Review(models.Model):
     text = models.TextField(max_length=256)
     stars = models.IntegerField(choices=STARS, default=5)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True, related_name='reviews')
+    owner = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE)
 
     def __str__(self):
         return self.text

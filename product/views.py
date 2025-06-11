@@ -2,158 +2,137 @@ from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.response import Response
 from .models import Category, Review, Product
-from .serializers import ProductSerializer, ReviewSerilizer, CategorySerializer,ProductReviewsSerializer, ProductValidateSerializer,CategoryValidateSerializer, ReviewValidateSerializer
+from .serializers import (
+    ProductSerializer, ReviewSerilizer, CategorySerializer,
+    ProductReviewsSerializer, ProductValidateSerializer,
+    CategoryValidateSerializer, ReviewValidateSerializer
+)
 from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework.generics import RetrieveUpdateDestroyAPIView, ListAPIView
-
-
+from common.permission import IsAuthenticatedOrReadOnly, IsSuperUser, IsStaff
 from rest_framework.permissions import AllowAny
-from common.permission import IsOwner, IsAnonymousReadOnly, IsSuperUser, IsStaff
 
 
 class ProductListApi(APIView):
-    
-    permission_classes = [IsOwner]
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get(self, request):
-        product = Product.objects.all()
-        data = ProductSerializer(product, many=True).data
-
+        products = Product.objects.all()
+        data = ProductSerializer(products, many=True).data
         return Response(data=data)
-    
+
     @swagger_auto_schema(request_body=ProductValidateSerializer)
     def post(self, request):
         serializer = ProductValidateSerializer(data=request.data)
-
         if not serializer.is_valid():
             return Response(status=status.HTTP_400_BAD_REQUEST, data=serializer.errors)
-        
-        with transaction.atomic():
-            title = serializer.validated_data.get('title')
-            description = serializer.validated_data.get('description')
-            price = serializer.validated_data.get('price')
-            category_id = serializer.validated_data.get('category_id')
 
+        with transaction.atomic():
             product = Product.objects.create(
-                title=title,
-                description=description,
-                price=price,
-                category_id=category_id,
-                owner = request.user
+                title=serializer.validated_data['title'],
+                description=serializer.validated_data['description'],
+                price=serializer.validated_data['price'],
+                category_id=serializer.validated_data['category_id'],
+                owner=request.user
             )
 
-        return Response(status=status.HTTP_201_CREATED,
-                            data=ProductSerializer(product).data)
+        return Response(status=status.HTTP_201_CREATED, data=ProductSerializer(product).data)
+
 
 class ProductDetailView(RetrieveUpdateDestroyAPIView):
     queryset = Product.objects.all()
     lookup_field = 'id'
 
     def get_serializer_class(self):
-        
         if self.request.method == 'PUT':
             return ProductValidateSerializer
         return ProductSerializer
-    
+
     def update(self, request, *args, **kwargs):
         product = self.get_object()
-        serializer = self.get_serializer(data=request.data)  
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         product.title = serializer.validated_data['title']
         product.description = serializer.validated_data['description']
         product.price = serializer.validated_data['price']
-        product.category_id = serializer.validated_data['product_id']
+        product.category_id = serializer.validated_data['category_id']
         product.save()
 
-        return Response(status=status.HTTP_201_CREATED, data=self.get_serializer(product).data)
-    
+        return Response(status=status.HTTP_201_CREATED, data=ProductSerializer(product).data)
+
     def delete(self, request, *args, **kwargs):
-        product = self.get_object()
-        product.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-    
+        return super().delete(request, *args, **kwargs)
+
+
 class CategoryListApiView(APIView):
-    permission_classes = [IsAnonymousReadOnly]
+    permission_classes = [IsAuthenticatedOrReadOnly | IsSuperUser]
 
     def get(self, request):
-        category = Category.objects.all()
-        data = CategorySerializer(category, many=True).data
+        categories = Category.objects.all()
+        data = CategorySerializer(categories, many=True).data
         return Response(data=data)
-    
+
     @swagger_auto_schema(request_body=CategoryValidateSerializer)
     def post(self, request):
         serializer = CategoryValidateSerializer(data=request.data)
-
         if not serializer.is_valid():
             return Response(status=status.HTTP_400_BAD_REQUEST, data=serializer.errors)
 
-        name = serializer.validated_data.get('name')
+        category = Category.objects.create(name=serializer.validated_data['name'])
+        return Response(status=status.HTTP_201_CREATED, data=CategorySerializer(category).data)
 
-        category = Category.objects.create(
-            name=name
-        )
-
-        return Response(status=status.HTTP_201_CREATED,
-                        data=CategorySerializer(category).data)
 
 class CategoryDetailListView(RetrieveUpdateDestroyAPIView):
     queryset = Category.objects.all()
     lookup_field = 'id'
     permission_classes = [IsSuperUser]
-    
-    def get_serializer_class(self, *args, **kwargs):
-        
+
+    def get_serializer_class(self):
         if self.request.method == "PUT":
             return CategoryValidateSerializer
         return CategorySerializer
-    
+
     def update(self, request, *args, **kwargs):
         category = self.get_object()
-        serializer = self.get_serializer(data=request.data)  
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        category.name = serializer.validated_data.get('name')
+        category.name = serializer.validated_data['name']
         category.save()
 
-        return Response(status=status.HTTP_201_CREATED, data=self.get_serializer(category).data)
-    
+        return Response(status=status.HTTP_201_CREATED, data=CategorySerializer(category).data)
+
     def delete(self, request, *args, **kwargs):
         return super().delete(request, *args, **kwargs)
 
 
 class ReviewListAPiView(APIView):
-    permission_classes = [IsAnonymousReadOnly]
-    
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
     def get(self, request):
-        review = Review.objects.all()
-        data = ReviewSerilizer(review, many=True).data
+        reviews = Review.objects.all()
+        data = ReviewSerilizer(reviews, many=True).data
         return Response(data=data)
+
     @swagger_auto_schema(request_body=ReviewValidateSerializer)
     def post(self, request):
         serializer = ReviewValidateSerializer(data=request.data)
-
         if not serializer.is_valid():
             return Response(status=status.HTTP_400_BAD_REQUEST, data=serializer.errors)
-        
-        
-        text = serializer.validated_data.get('text')
-        stars = serializer.validated_data.get('stars')
-        product_id=serializer.validated_data.get('product_id')
 
         review = Review.objects.create(
-            text=text,
-            stars=stars,
-            product_id=product_id
+            text=serializer.validated_data['text'],
+            stars=serializer.validated_data['stars'],
+            product_id=serializer.validated_data['product_id'],
+            owner=request.user
         )
 
+        return Response(status=status.HTTP_201_CREATED, data=ReviewSerilizer(review).data)
 
-        return Response(status=status.HTTP_201_CREATED,
-                        data=ReviewSerilizer(review).data)
 
 class ReviewDetailApi(RetrieveUpdateDestroyAPIView):
-
     queryset = Review.objects.all()
     lookup_field = 'id'
     permission_classes = [IsStaff]
@@ -162,10 +141,10 @@ class ReviewDetailApi(RetrieveUpdateDestroyAPIView):
         if self.request.method == 'PUT':
             return ReviewValidateSerializer
         return ReviewSerilizer
-    
+
     def update(self, request, *args, **kwargs):
         review = self.get_object()
-        serializer = self.get_serializer(data=request.data)  
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         review.text = serializer.validated_data['text']
@@ -173,16 +152,13 @@ class ReviewDetailApi(RetrieveUpdateDestroyAPIView):
         review.product_id = serializer.validated_data['product_id']
         review.save()
 
-        return Response(status=status.HTTP_201_CREATED, data=self.get_serializer(review).data)
-    
+        return Response(status=status.HTTP_201_CREATED, data=ReviewSerilizer(review).data)
+
     def delete(self, request, *args, **kwargs):
         return super().delete(request, *args, **kwargs)
-        
+
 
 class ProductReviewApi(ListAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductReviewsSerializer
-
-
-
-
+    permission_classes = [AllowAny]
