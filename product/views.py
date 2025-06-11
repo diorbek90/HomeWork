@@ -1,5 +1,4 @@
-from django.shortcuts import render
-from rest_framework.decorators import api_view
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.response import Response
 from .models import Category, Review, Product
@@ -8,7 +7,14 @@ from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework.generics import RetrieveUpdateDestroyAPIView, ListAPIView
 
+
+from rest_framework.permissions import AllowAny
+from common.permission import IsOwner, IsAnonymousReadOnly, IsSuperUser, IsStaff
+
+
 class ProductListApi(APIView):
+    
+    permission_classes = [IsOwner]
 
     def get(self, request):
         product = Product.objects.all()
@@ -16,6 +22,7 @@ class ProductListApi(APIView):
 
         return Response(data=data)
     
+    @swagger_auto_schema(request_body=ProductValidateSerializer)
     def post(self, request):
         serializer = ProductValidateSerializer(data=request.data)
 
@@ -32,7 +39,8 @@ class ProductListApi(APIView):
                 title=title,
                 description=description,
                 price=price,
-                category_id=category_id
+                category_id=category_id,
+                owner = request.user
             )
 
         return Response(status=status.HTTP_201_CREATED,
@@ -67,12 +75,14 @@ class ProductDetailView(RetrieveUpdateDestroyAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
     
 class CategoryListApiView(APIView):
+    permission_classes = [IsAnonymousReadOnly]
 
     def get(self, request):
         category = Category.objects.all()
         data = CategorySerializer(category, many=True).data
         return Response(data=data)
     
+    @swagger_auto_schema(request_body=CategoryValidateSerializer)
     def post(self, request):
         serializer = CategoryValidateSerializer(data=request.data)
 
@@ -91,6 +101,8 @@ class CategoryListApiView(APIView):
 class CategoryDetailListView(RetrieveUpdateDestroyAPIView):
     queryset = Category.objects.all()
     lookup_field = 'id'
+    permission_classes = [IsSuperUser]
+    
     def get_serializer_class(self, *args, **kwargs):
         
         if self.request.method == "PUT":
@@ -112,12 +124,13 @@ class CategoryDetailListView(RetrieveUpdateDestroyAPIView):
 
 
 class ReviewListAPiView(APIView):
+    permission_classes = [IsAnonymousReadOnly]
     
     def get(self, request):
         review = Review.objects.all()
         data = ReviewSerilizer(review, many=True).data
         return Response(data=data)
-    
+    @swagger_auto_schema(request_body=ReviewValidateSerializer)
     def post(self, request):
         serializer = ReviewValidateSerializer(data=request.data)
 
@@ -143,6 +156,7 @@ class ReviewDetailApi(RetrieveUpdateDestroyAPIView):
 
     queryset = Review.objects.all()
     lookup_field = 'id'
+    permission_classes = [IsStaff]
 
     def get_serializer_class(self):
         if self.request.method == 'PUT':

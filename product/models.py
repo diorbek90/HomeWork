@@ -12,7 +12,7 @@ class Product(models.Model):
     description = models.CharField(null=True, max_length=256)
     price = models.IntegerField(null=True)
     category = models.ForeignKey(Category, on_delete=models.CASCADE, null=True, related_name='products')
-
+    owner = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, related_name='customuser')
     def __str__(self):
         return self.title
 
